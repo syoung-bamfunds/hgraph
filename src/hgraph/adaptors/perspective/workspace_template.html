@@ -47,8 +47,8 @@
 
                 let ws = "ws"
                 if (location.protocol === 'https:'){ ws = "wss"; }
-                const websocket_ro = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_readonly");
-                const websocket_rw = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_editable");
+                const websocket_ro = perspective.websocket(ws + "://" + location.host + "/websocket_readonly");
+                const websocket_rw = perspective.websocket(ws + "://" + location.host + "/websocket_editable");
 
                 //{% for table_name in mgr.get_table_names() %}
                 //{% if not table_name.endswith("_removes") %}

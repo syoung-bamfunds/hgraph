@@ -29,7 +29,7 @@
                 const viewer = document.getElementById("viewer");
                 let ws = "ws"
                 if (location.protocol === 'https:'){ ws = "wss"; }
-                const websocket = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket{{'_readonly' if not editable else '_editable'}}");
+                const websocket = perspective.websocket(ws + "://" + location.host + "/websocket{{'_readonly' if not editable else '_editable'}}");
                 const table = websocket.open_table("{{table_name}}");
                 viewer.load(table);
                 viewer.toggleConfig();

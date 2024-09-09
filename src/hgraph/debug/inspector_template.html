@@ -37,8 +37,8 @@
 
                 let ws = "ws"
                 if (location.protocol === 'https:'){ ws = "wss"; }
-                const websocket_ro = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_readonly");
-                const websocket_rw = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_editable");
+                const websocket_ro = perspective.websocket(ws + "://" + location.host + "/websocket_readonly");
+                const websocket_rw = perspective.websocket(ws + "://" + location.host + "/websocket_editable");
 
                 //{% for table_name in mgr.get_table_names() %}
                 //{% if not table_name.endswith("_removes") %}
@@ -123,6 +123,17 @@
                             return [stuff.num_columns, stuff.num_rows]
                         }
 
+                        async function fetch_alert(url) {
+                            const reply = await fetch(url, {cache: "no-store"});
+                            if (reply.status === 200) {
+                                return await reply.text()
+                            } else {
+                                const msg = await reply.text()
+                                console.error(msg)
+                                alert(msg)
+                            }
+                        }
+
                         table.addEventListener("click", async function observerClickEventListener(event) {
                             if (event.target.tagName === "TD") {
                                 const [meta, stuff, row] = await targetInfo(event.target);
@@ -130,9 +141,9 @@
                                 if (meta.column_header[0] === 'X'){
                                     event.target.style.cursor = "progress";
                                     if (meta.value === '+') {
-                                        await fetch("/inspect/expand/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/expand/" + row.id, {cache: "no-store"});
                                     } else {
-                                        await fetch("/inspect/collapse/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/collapse/" + row.id, {cache: "no-store"});
                                     }
                                 }
                                 if (meta.column_header[0] === 'value') {
@@ -172,6 +183,8 @@
                         });
 
                         table.addEventListener("keydown", async function observerKeydownEventListener(event) {
+                            event.stopPropagation()
+
                             if (event.key === "/" || event.key === "?") {
                                 const searchRow = table.querySelector(".highlight");
                                 if (searchRow) {
@@ -187,11 +200,11 @@
                                         const search = event.target.value;
                                         console.log("searching for " + search)
                                         if (search.length > 1){
-                                            const found = await fetch("/inspect/search/" + row.id + "?" +
+                                            const found = await fetch_alert("/inspect/search/" + row.id + "?" +
                                                 new URLSearchParams({q: search}).toString(),
                                                 {cache: "no-store"});
                                         } else {
-                                            const found = await fetch("/inspect/stopsearch/", {cache: "no-store"});
+                                            const found = await fetch_alert("/inspect/stopsearch/", {cache: "no-store"});
                                         }
                                     });
                                     search.addEventListener("keydown", async function searchEventListener(event) {
@@ -199,13 +212,13 @@
                                             console.log("end searching for " + search)
                                             event.stopPropagation()
                                             event.target.remove();
-                                            await fetch("/inspect/applysearch/", {cache: "no-store"});
+                                            await fetch_alert("/inspect/applysearch/", {cache: "no-store"});
                                             table.focus();
                                         } else if (event.key === "Escape") {
                                             console.log("cancel searching for " + search)
                                             event.stopPropagation()
                                             event.target.remove();
-                                            await fetch("/inspect/stopsearch/", {cache: "no-store"});
+                                            await fetch_alert("/inspect/stopsearch/", {cache: "no-store"});
                                             table.focus();
                                         }
                                     });
@@ -237,9 +250,9 @@
                                     const [meta, stuff, row] = await targetInfo(searchRow.children[0]);
 
                                     if (row.X === '+' || row.X === '?') {
-                                        await fetch("/inspect/expand/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/expand/" + row.id, {cache: "no-store"});
                                     } else {
-                                        await fetch("/inspect/collapse/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/collapse/" + row.id, {cache: "no-store"});
                                     }
                                 }
                             }
@@ -252,13 +265,13 @@
                                 if (meta.column_header[0] === 'name'){
                                     if (row.X === '+') {
                                         if (event.ctrlKey) {
-                                            await fetch("/inspect/expand/" + row.id + "?" + new URLSearchParams({all: 'true'}).toString(),
+                                            await fetch_alert("/inspect/expand/" + row.id + "?" + new URLSearchParams({all: 'true'}).toString(),
                                                 {cache: "no-store"});
                                         } else {
-                                            await fetch("/inspect/expand/" + row.id, {cache: "no-store"});
+                                            await fetch_alert("/inspect/expand/" + row.id, {cache: "no-store"});
                                         }
                                     } else {
-                                        await fetch("/inspect/collapse/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/collapse/" + row.id, {cache: "no-store"});
                                     }
                                 }
                             }
