@@ -45,8 +45,10 @@
                 const workspace = window.workspace
                 const worker = perspective.worker();
 
-                const websocket_ro = perspective.websocket("ws://{{host}}:{{port}}/websocket_readonly");
-                const websocket_rw = perspective.websocket("ws://{{host}}:{{port}}/websocket_editable");
+                let ws = "ws"
+                if (location.protocol === 'https:'){ ws = "wss"; }
+                const websocket_ro = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_readonly");
+                const websocket_rw = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_editable");
 
                 //{% for table_name in mgr.get_table_names() %}
                 //{% if not table_name.endswith("_removes") %}

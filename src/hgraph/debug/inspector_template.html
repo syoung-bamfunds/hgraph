@@ -3,15 +3,15 @@
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
 
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer/dist/cdn/perspective-viewer.js"></script>
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-workspace/dist/cdn/perspective-workspace.js"></script>
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer-datagrid/dist/cdn/perspective-viewer-datagrid.js"></script>
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer-d3fc/dist/cdn/perspective-viewer-d3fc.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-viewer/dist/cdn/perspective-viewer.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-workspace/dist/cdn/perspective-workspace.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-viewer-datagrid/dist/cdn/perspective-viewer-datagrid.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-viewer-d3fc/dist/cdn/perspective-viewer-d3fc.js"></script>
         <script type="module" src="/node_modules/perspective-viewer-datagrid-norollups/dist/cdn/perspective-viewer-datagrid-norollups.js"></script>
         <script type="module" src="/node_modules/perspective-viewer-summary/dist/cdn/perspective-viewer-summary.js"></script>
 
-        <link rel="stylesheet" crossorigin="anonymous" href="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer/dist/css/themes.css" />
-        <link rel="stylesheet" crossorigin="anonymous" href="http://{{host}}:{{port}}/node_modules/@finos/perspective-workspace/dist/css/pro-dark.css" />
+        <link rel="stylesheet" crossorigin="anonymous" href="/node_modules/@finos/perspective-viewer/dist/css/themes.css" />
+        <link rel="stylesheet" crossorigin="anonymous" href="/node_modules/@finos/perspective-workspace/dist/css/pro-dark.css" />
 
         <style>
             perspective-workspace {
@@ -29,14 +29,16 @@
         <perspective-workspace id="workspace"></perspective-workspace>
 
         <script type="module">
-            import perspective from "http://{{host}}:{{port}}/node_modules/@finos/perspective/dist/cdn/perspective.js";
+            import perspective from "/node_modules/@finos/perspective/dist/cdn/perspective.js";
 
             window.addEventListener("DOMContentLoaded", async function () {
                 const workspace = window.workspace
                 const worker = perspective.worker();
 
-                const websocket_ro = perspective.websocket("ws://{{host}}:{{port}}/websocket_readonly");
-                const websocket_rw = perspective.websocket("ws://{{host}}:{{port}}/websocket_editable");
+                let ws = "ws"
+                if (location.protocol === 'https:'){ ws = "wss"; }
+                const websocket_ro = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_readonly");
+                const websocket_rw = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket_editable");
 
                 //{% for table_name in mgr.get_table_names() %}
                 //{% if not table_name.endswith("_removes") %}

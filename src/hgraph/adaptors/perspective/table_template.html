@@ -27,7 +27,9 @@
             import perspective from "/node_modules/@finos/perspective/dist/cdn/perspective.js";
             window.addEventListener("DOMContentLoaded", async function () {
                 const viewer = document.getElementById("viewer");
-                const websocket = perspective.websocket("ws://{{host}}:{{port}}/websocket{{'_readonly' if not editable else '_editable'}}");
+                let ws = "ws"
+                if (location.protocol === 'https:'){ ws = "wss"; }
+                const websocket = perspective.websocket(ws + "://" + location.host + ":" + location.port + "/websocket{{'_readonly' if not editable else '_editable'}}");
                 const table = websocket.open_table("{{table_name}}");
                 viewer.load(table);
                 viewer.toggleConfig();

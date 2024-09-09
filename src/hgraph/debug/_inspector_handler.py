@@ -322,8 +322,9 @@ def handle_inspector_request(state: InspectorState, request: HttpGetRequest, f: 
                     return
         except Exception as e:
             set_result(f, HttpResponse(500, body=f"Error: {e}"))
-            # return
-            raise e
+            print(f"Inspector error {e}")
+            return
+            # raise e
 
         total_response += response if not total_response else (f"\n{response}" if response else "")
         commands.extend(new_commands)
