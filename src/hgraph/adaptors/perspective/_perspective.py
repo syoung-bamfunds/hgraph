@@ -230,7 +230,9 @@ def _get_node_location():
     import subprocess
 
     result = subprocess.run(["npm", "root", "-g", "for", "npm"], shell=True, capture_output=True, text=True)
-    return result.stdout.rstrip()
+    node_path = result.stdout.rstrip()
+    print(f"NPM found at '{node_path}'")
+    return node_path
 
 
 @perspective_web.start
