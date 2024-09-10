@@ -81,8 +81,6 @@
                 const json = await req.json();
                 window.workspace.restore(json);
 
-                const observe = await fetch("/inspect/expand/", {cache: "no-store"});
-
                 window.workspace.addEventListener("workspace-layout-update", async () => {
                     await fetch("/layout/{{url}}", {method: "post", body: JSON.stringify(await window.workspace.save())});
 
@@ -289,6 +287,8 @@
                         });
                     }
                 });
+
+                const observe = await fetch("/inspect/expand/", {cache: "no-store"});
             });
         </script>
     </body>

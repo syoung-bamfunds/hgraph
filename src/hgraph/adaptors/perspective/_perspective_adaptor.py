@@ -73,12 +73,7 @@ def publish_multitable_impl(
     @graph
     def merge_references(keys: TSS[int], ts: TSD[int, REF[TSB[TS_SCHEMA]]], _schema: Type[TS_SCHEMA] = TS_SCHEMA) -> TSB[TS_SCHEMA]:
         selection = map_(lambda t: t, ts, __keys__=keys)
-
-        out = {}
-        for k, t in _schema.__meta_data_schema__.items():
-            out[k] = getattr(selection, k).reduce(lambda x, y: race(x, y), nothing(REF[t]))
-
-        return combine[TSB[_schema]](**out)
+        return race(tsd=selection)
 
     @graph(overloads=merge_references)
     def merge_references_no_tsb(keys: TSS[int], ts: TSD[int, REF[TS[SCALAR]]]) -> REF[TS[SCALAR]]:
