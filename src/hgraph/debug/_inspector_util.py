@@ -8,7 +8,7 @@ from hgraph import Node, Graph, PythonTimeSeriesValueInput, PythonTimeSeriesValu
     PythonTimeSeriesReferenceOutput, PythonTimeSeriesReferenceInput, PythonTimeSeriesReference, \
     TimeSeriesList, TimeSeriesDict, TimeSeriesBundle, TimeSeriesSet, TimeSeriesInput, TimeSeriesOutput, \
     PythonNestedNodeImpl, PythonTsdMapNodeImpl, PythonServiceNodeImpl, PythonReduceNodeImpl, PythonSwitchNodeImpl, \
-    PythonTryExceptNodeImpl, HgTSBTypeMetaData, PythonPushQueueNodeImpl
+    PythonTryExceptNodeImpl, HgTSBTypeMetaData, PythonPushQueueNodeImpl, CompoundScalar
 from hgraph._impl._runtime._component_node import PythonComponentNodeImpl
 from hgraph._impl._runtime._mesh_node import PythonMeshNodeImpl
 
@@ -191,6 +191,18 @@ def _(value: set):
 
 
 @enum_items.register
+def _(value: CompoundScalar):
+    yield from ((k, v) for k, v in value.to_dict().items())
+
+
+@enum_items.register
+def _(value: Union[PythonTimeSeriesValueOutput, PythonTimeSeriesValueInput]):
+    if value.valid:
+        yield from enum_items(value.value)
+    yield from ()
+
+
+@enum_items.register
 def _(value: Union[PythonTimeSeriesReferenceOutput, PythonTimeSeriesReferenceInput]):
     if value.valid:
         ref = value.value
@@ -299,6 +311,11 @@ def inspect_item(value, key):
     return value[key]
 
 
+@multimethod
+def inspect_item(value: CompoundScalar, key):
+    return getattr(value, key)
+
+
 @inspect_item.register
 def _(value: PythonNestedNodeImpl, key):
     return value.nested_graphs().get(key)
@@ -312,3 +329,9 @@ def _(value: PythonTimeSeriesReference, key):
 @inspect_item.register
 def _(value: Union[PythonTimeSeriesReferenceInput | PythonTimeSeriesReferenceOutput], key):
     return value.value.items[key]
+
+
+@inspect_item.register
+def _(value: Union[PythonTimeSeriesValueInput | PythonTimeSeriesValueOutput], key):
+    if value.valid:
+        return inspect_item(value.value, key)

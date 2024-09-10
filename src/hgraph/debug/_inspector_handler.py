@@ -262,7 +262,11 @@ def handle_requests(state: InspectorState):
 def handle_inspector_request(state: InspectorState, request: HttpGetRequest, f: Future):
     command = request.url_parsed_args[0]
     item_str = request.url_parsed_args[1]
-    item_id = InspectorItemId.from_str(item_str)
+    try:
+        item_id = InspectorItemId.from_str(item_str)
+    except Exception as e:
+        set_result(f, HttpResponse(500, body=f"Invalid item {item_str}"))
+        return
 
     commands = deque()
     commands.append((command, item_id))
@@ -322,8 +326,9 @@ def handle_inspector_request(state: InspectorState, request: HttpGetRequest, f: 
                     return
         except Exception as e:
             set_result(f, HttpResponse(500, body=f"Error: {e}"))
-            # return
-            raise e
+            print(f"Inspector error {e}")
+            return
+            # raise e
 
         total_response += response if not total_response else (f"\n{response}" if response else "")
         commands.extend(new_commands)

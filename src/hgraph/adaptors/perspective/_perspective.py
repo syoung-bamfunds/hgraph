@@ -229,8 +229,10 @@ def _get_node_location():
     """Assuming node is installed this will retrieve the global local for npm modules"""
     import subprocess
 
-    result = subprocess.run(["npm", "root", "-g", "for", "npm"], shell=True, capture_output=True, text=True)
-    return result.stdout.rstrip()
+    result = subprocess.run(["npm", "root", "-g", "for", "npm"], shell=os.name == 'nt', capture_output=True, text=True)
+    node_path = result.stdout.rstrip()
+    print(f"NPM found at '{node_path}'")
+    return node_path
 
 
 @perspective_web.start

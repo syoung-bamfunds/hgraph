@@ -3,15 +3,15 @@
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
 
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer/dist/cdn/perspective-viewer.js"></script>
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-workspace/dist/cdn/perspective-workspace.js"></script>
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer-datagrid/dist/cdn/perspective-viewer-datagrid.js"></script>
-        <script type="module" src="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer-d3fc/dist/cdn/perspective-viewer-d3fc.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-viewer/dist/cdn/perspective-viewer.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-workspace/dist/cdn/perspective-workspace.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-viewer-datagrid/dist/cdn/perspective-viewer-datagrid.js"></script>
+        <script type="module" src="/node_modules/@finos/perspective-viewer-d3fc/dist/cdn/perspective-viewer-d3fc.js"></script>
         <script type="module" src="/node_modules/perspective-viewer-datagrid-norollups/dist/cdn/perspective-viewer-datagrid-norollups.js"></script>
         <script type="module" src="/node_modules/perspective-viewer-summary/dist/cdn/perspective-viewer-summary.js"></script>
 
-        <link rel="stylesheet" crossorigin="anonymous" href="http://{{host}}:{{port}}/node_modules/@finos/perspective-viewer/dist/css/themes.css" />
-        <link rel="stylesheet" crossorigin="anonymous" href="http://{{host}}:{{port}}/node_modules/@finos/perspective-workspace/dist/css/pro-dark.css" />
+        <link rel="stylesheet" crossorigin="anonymous" href="/node_modules/@finos/perspective-viewer/dist/css/themes.css" />
+        <link rel="stylesheet" crossorigin="anonymous" href="/node_modules/@finos/perspective-workspace/dist/css/pro-dark.css" />
 
         <style>
             perspective-workspace {
@@ -29,14 +29,16 @@
         <perspective-workspace id="workspace"></perspective-workspace>
 
         <script type="module">
-            import perspective from "http://{{host}}:{{port}}/node_modules/@finos/perspective/dist/cdn/perspective.js";
+            import perspective from "/node_modules/@finos/perspective/dist/cdn/perspective.js";
 
             window.addEventListener("DOMContentLoaded", async function () {
                 const workspace = window.workspace
                 const worker = perspective.worker();
 
-                const websocket_ro = perspective.websocket("ws://{{host}}:{{port}}/websocket_readonly");
-                const websocket_rw = perspective.websocket("ws://{{host}}:{{port}}/websocket_editable");
+                let ws = "ws"
+                if (location.protocol === 'https:'){ ws = "wss"; }
+                const websocket_ro = perspective.websocket(ws + "://" + location.host + "/websocket_readonly");
+                const websocket_rw = perspective.websocket(ws + "://" + location.host + "/websocket_editable");
 
                 //{% for table_name in mgr.get_table_names() %}
                 //{% if not table_name.endswith("_removes") %}
@@ -91,6 +93,10 @@
                         sheet.replaceSync( `.highlight { background-color: pink }`)
                         g.shadowRoot.adoptedStyleSheets.push(sheet)
 
+                        function isOverflown(element) {
+                          return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
+                        }
+
                         let SELECTED_ROW = null;
                         table.addStyleListener(function fixOverflow() {
                             for (const tr of table.children[0].children[1].children) {
@@ -102,6 +108,9 @@
                                 }
 
                                 for (const td of tr.children) {
+                                    if (isOverflown(td)) {
+                                        td.title = td.innerText;
+                                    }
                                     td.style.overflow = "clip";
                                 }
                             }
@@ -121,6 +130,17 @@
                             return [stuff.num_columns, stuff.num_rows]
                         }
 
+                        async function fetch_alert(url) {
+                            const reply = await fetch(url, {cache: "no-store"});
+                            if (reply.status === 200) {
+                                return await reply.text()
+                            } else {
+                                const msg = await reply.text()
+                                console.error(msg)
+                                alert(msg)
+                            }
+                        }
+
                         table.addEventListener("click", async function observerClickEventListener(event) {
                             if (event.target.tagName === "TD") {
                                 const [meta, stuff, row] = await targetInfo(event.target);
@@ -128,9 +148,9 @@
                                 if (meta.column_header[0] === 'X'){
                                     event.target.style.cursor = "progress";
                                     if (meta.value === '+') {
-                                        await fetch("/inspect/expand/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/expand/" + row.id, {cache: "no-store"});
                                     } else {
-                                        await fetch("/inspect/collapse/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/collapse/" + row.id, {cache: "no-store"});
                                     }
                                 }
                                 if (meta.column_header[0] === 'value') {
@@ -140,14 +160,18 @@
                                         if (reply.status === 200) {
                                             const new_row = await reply.text()
                                             console.log("looking for row " + new_row)
-                                            window.setTimeout(async () => {
+                                            window.setTimeout(async function lookForRow() {
                                                 const id_col = stuff.column_headers.findIndex((c) => {
                                                     return c[0] === 'id'
                                                 })
                                                 const ids = await table._view_cache.view(id_col, 0, id_col + 1, meta.y);
                                                 let row_num = ids.metadata[0].indexOf(new_row);
-                                                table.scrollToCell(0, row_num, ids.num_columns, ids.num_rows)
-                                                SELECTED_ROW = row_num;
+                                                if (row_num === -1) {
+                                                    window.setTimeout(lookForRow, 250);
+                                                } else {
+                                                    table.scrollToCell(0, row_num, ids.num_columns, ids.num_rows)
+                                                    SELECTED_ROW = row_num;
+                                                }
                                             }, 250);
                                         } else {
                                             const msg = await reply.text()
@@ -170,6 +194,8 @@
                         });
 
                         table.addEventListener("keydown", async function observerKeydownEventListener(event) {
+                            event.stopPropagation()
+
                             if (event.key === "/" || event.key === "?") {
                                 const searchRow = table.querySelector(".highlight");
                                 if (searchRow) {
@@ -185,11 +211,11 @@
                                         const search = event.target.value;
                                         console.log("searching for " + search)
                                         if (search.length > 1){
-                                            const found = await fetch("/inspect/search/" + row.id + "?" +
+                                            const found = await fetch_alert("/inspect/search/" + row.id + "?" +
                                                 new URLSearchParams({q: search}).toString(),
                                                 {cache: "no-store"});
                                         } else {
-                                            const found = await fetch("/inspect/stopsearch/", {cache: "no-store"});
+                                            const found = await fetch_alert("/inspect/stopsearch/", {cache: "no-store"});
                                         }
                                     });
                                     search.addEventListener("keydown", async function searchEventListener(event) {
@@ -197,13 +223,13 @@
                                             console.log("end searching for " + search)
                                             event.stopPropagation()
                                             event.target.remove();
-                                            await fetch("/inspect/applysearch/", {cache: "no-store"});
+                                            await fetch_alert("/inspect/applysearch/", {cache: "no-store"});
                                             table.focus();
                                         } else if (event.key === "Escape") {
                                             console.log("cancel searching for " + search)
                                             event.stopPropagation()
                                             event.target.remove();
-                                            await fetch("/inspect/stopsearch/", {cache: "no-store"});
+                                            await fetch_alert("/inspect/stopsearch/", {cache: "no-store"});
                                             table.focus();
                                         }
                                     });
@@ -235,9 +261,9 @@
                                     const [meta, stuff, row] = await targetInfo(searchRow.children[0]);
 
                                     if (row.X === '+' || row.X === '?') {
-                                        await fetch("/inspect/expand/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/expand/" + row.id, {cache: "no-store"});
                                     } else {
-                                        await fetch("/inspect/collapse/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/collapse/" + row.id, {cache: "no-store"});
                                     }
                                 }
                             }
@@ -250,13 +276,13 @@
                                 if (meta.column_header[0] === 'name'){
                                     if (row.X === '+') {
                                         if (event.ctrlKey) {
-                                            await fetch("/inspect/expand/" + row.id + "?" + new URLSearchParams({all: 'true'}).toString(),
+                                            await fetch_alert("/inspect/expand/" + row.id + "?" + new URLSearchParams({all: 'true'}).toString(),
                                                 {cache: "no-store"});
                                         } else {
-                                            await fetch("/inspect/expand/" + row.id, {cache: "no-store"});
+                                            await fetch_alert("/inspect/expand/" + row.id, {cache: "no-store"});
                                         }
                                     } else {
-                                        await fetch("/inspect/collapse/" + row.id, {cache: "no-store"});
+                                        await fetch_alert("/inspect/collapse/" + row.id, {cache: "no-store"});
                                     }
                                 }
                             }
