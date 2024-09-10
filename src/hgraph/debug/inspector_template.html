@@ -93,6 +93,10 @@
                         sheet.replaceSync( `.highlight { background-color: pink }`)
                         g.shadowRoot.adoptedStyleSheets.push(sheet)
 
+                        function isOverflown(element) {
+                          return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
+                        }
+
                         let SELECTED_ROW = null;
                         table.addStyleListener(function fixOverflow() {
                             for (const tr of table.children[0].children[1].children) {
@@ -104,6 +108,9 @@
                                 }
 
                                 for (const td of tr.children) {
+                                    if (isOverflown(td)) {
+                                        td.title = td.innerText;
+                                    }
                                     td.style.overflow = "clip";
                                 }
                             }
@@ -153,14 +160,18 @@
                                         if (reply.status === 200) {
                                             const new_row = await reply.text()
                                             console.log("looking for row " + new_row)
-                                            window.setTimeout(async () => {
+                                            window.setTimeout(async function lookForRow() {
                                                 const id_col = stuff.column_headers.findIndex((c) => {
                                                     return c[0] === 'id'
                                                 })
                                                 const ids = await table._view_cache.view(id_col, 0, id_col + 1, meta.y);
                                                 let row_num = ids.metadata[0].indexOf(new_row);
-                                                table.scrollToCell(0, row_num, ids.num_columns, ids.num_rows)
-                                                SELECTED_ROW = row_num;
+                                                if (row_num === -1) {
+                                                    window.setTimeout(lookForRow, 250);
+                                                } else {
+                                                    table.scrollToCell(0, row_num, ids.num_columns, ids.num_rows)
+                                                    SELECTED_ROW = row_num;
+                                                }
                                             }, 250);
                                         } else {
                                             const msg = await reply.text()

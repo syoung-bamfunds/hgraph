@@ -176,7 +176,7 @@ class PythonMeshNodeImpl(PythonTsdMapNodeImpl):
 
     def _create_new_graph(self, key: K, rank=None):
         """Create new graph instance and wire it into the node"""
-        graph: Graph = self.nested_graph_builder.make_instance(self.node_id + (self._count,), self, str(key))
+        graph: Graph = self.nested_graph_builder.make_instance(self.node_id + (-self._count,), self, str(key))
         self._count += 1
         self._active_graphs[key] = graph
         self._active_graphs_rank[key] = self.max_rank if rank is None else rank
