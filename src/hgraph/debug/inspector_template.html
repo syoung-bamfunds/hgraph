@@ -108,6 +108,8 @@
                                 for (const td of tr.children) {
                                     if (isOverflown(td)) {
                                         td.title = td.innerText;
+                                    } else {
+                                        td.title = undefined;
                                     }
                                     td.style.overflow = "clip";
                                 }
