@@ -81,13 +81,16 @@
                 const json = await req.json();
                 window.workspace.restore(json);
 
-                const observe = await fetch("/inspect/expand/", {cache: "no-store"});
-
                 window.workspace.addEventListener("workspace-layout-update", async () => {
                     await fetch("/layout/{{url}}", {method: "post", body: JSON.stringify(await window.workspace.save())});
 
                     for (const g of document.querySelectorAll("perspective-viewer[table='inspector'] perspective-viewer-datagrid")){
                         const table = g.shadowRoot.querySelector("regular-table")
+
+                        if (table.dataset.events_set_up){
+                            continue;
+                        }
+                        table.dataset.events_set_up = true;
 
                         var sheet = new CSSStyleSheet
                         sheet.replaceSync( `.highlight { background-color: pink }`)
@@ -97,19 +100,44 @@
                           return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
                         }
 
+                        let name_col = null;
+                        function findNameCol(){
+                            if (!name_col){
+                                for (const td of table.children[0].children[1].children[0].children){
+                                    const meta = table.getMeta(td);
+                                    if (meta.column_header[0] === "name"){
+                                        name_col = meta.x;
+                                        break;
+                                    }
+                                }
+                            }
+                            return name_col
+                        }
+
                         let SELECTED_ROW = null;
+                        let SEARCH_TERM = null;
                         table.addStyleListener(function fixOverflow() {
                             for (const tr of table.children[0].children[1].children) {
                                 const meta = table.getMeta(tr.children[0]);
+
                                 if (meta.y === SELECTED_ROW) {
                                     tr.classList.add("highlight");
                                 }else{
                                     tr.classList.remove("highlight");
                                 }
 
+                                if (SEARCH_TERM){
+                                    const name = tr.children[findNameCol()];
+                                    if (name.innerText.includes(SEARCH_TERM)){
+                                        name.innerHTML = name.innerText.replace(SEARCH_TERM, "<mark>" + SEARCH_TERM + "</mark>");
+                                    }
+                                }
+
                                 for (const td of tr.children) {
                                     if (isOverflown(td)) {
                                         td.title = td.innerText;
+                                    } else {
+                                        td.title = undefined;
                                     }
                                     td.style.overflow = "clip";
                                 }
@@ -142,6 +170,8 @@
                         }
 
                         table.addEventListener("click", async function observerClickEventListener(event) {
+                            event.stopPropagation()
+
                             if (event.target.tagName === "TD") {
                                 const [meta, stuff, row] = await targetInfo(event.target);
 
@@ -182,9 +212,16 @@
                                 }
                                 if (meta.column_header[0] === 'name'){
                                     if (!event.ctrlKey && !event.altKey && !event.shiftKey) {
-                                        SELECTED_ROW = meta.y;
-                                        event.target.parentElement.classList.add("highlight");
-                                        table.draw();
+                                        const selectedRow = table.querySelector(".highlight");
+                                        if (selectedRow){
+                                            SELECTED_ROW = null;
+                                            selectedRow.classList.remove("highlight");
+                                            table.draw();
+                                        } else {
+                                            SELECTED_ROW = meta.y;
+                                            event.target.parentElement.classList.add("highlight");
+                                            table.draw();
+                                        }
                                     }
                                 }
                                 window.setTimeout(() => {
@@ -197,43 +234,103 @@
                             event.stopPropagation()
 
                             if (event.key === "/" || event.key === "?") {
-                                const searchRow = table.querySelector(".highlight");
-                                if (searchRow) {
-                                    const [meta, stuff, row] = await targetInfo(searchRow.children[0]);
-                                    const search = document.createElement("input");
-                                    search.type = "text";
-                                    search.style.position = "absolute";
-                                    search.style.top = searchRow.offsetTop + "px";
-                                    search.style.left = searchRow.offsetLeft + "px";
-                                    table.appendChild(search);
-                                    search.focus()
-                                    search.addEventListener("input", async function searchEventListener(event) {
-                                        const search = event.target.value;
-                                        console.log("searching for " + search)
-                                        if (search.length > 1){
+                                let searchRow = table.querySelector(".highlight");
+                                let topLevelSearch = false;
+                                if (!searchRow || event.key === "?") {
+                                    topLevelSearch = true
+                                    searchRow = table.children[0].children[1].children[0]
+                                }
+                                const [meta, stuff, row] = await targetInfo(searchRow.children[0]);
+                                const search = document.createElement("input");
+                                search.type = "text";
+                                search.style.position = "absolute";
+                                search.style.top = searchRow.offsetTop + "px";
+                                search.style.left = searchRow.offsetLeft + "px";
+                                table.appendChild(search);
+                                search.focus()
+                                search.addEventListener("input", async function searchEventListener(event) {
+                                    const search = event.target.value;
+                                    console.log("searching for " + search)
+                                    if (search.length > 1){
+                                        SEARCH_TERM = search;
+                                        if (!topLevelSearch) {
                                             const found = await fetch_alert("/inspect/search/" + row.id + "?" +
                                                 new URLSearchParams({q: search}).toString(),
                                                 {cache: "no-store"});
                                         } else {
+                                            const names = await table._view_cache.view(findNameCol(), 0, findNameCol() + 1, stuff.num_rows);
+                                            for (let i = SELECTED_ROW === null ? 0: SELECTED_ROW; i < names.metadata[0].length; i++){
+                                                if (names.metadata[0][i].includes(search)){
+                                                    table.scrollToCell(0, i, names.num_columns, names.num_rows)
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        SEARCH_TERM = null;
+                                        if (!topLevelSearch) {
                                             const found = await fetch_alert("/inspect/stopsearch/", {cache: "no-store"});
                                         }
-                                    });
-                                    search.addEventListener("keydown", async function searchEventListener(event) {
+                                    }
+                                    table.draw();
+                                });
+                                search.addEventListener("keydown", async function searchEventListener(event) {
+                                    event.stopPropagation()
+
+                                    const search = event.target.value;
+                                    console.log("searching for " + search)
+
+                                    if (!topLevelSearch) {
                                         if (event.key === "Enter") {
                                             console.log("end searching for " + search)
                                             event.stopPropagation()
                                             event.target.remove();
                                             await fetch_alert("/inspect/applysearch/", {cache: "no-store"});
                                             table.focus();
+                                            SEARCH_TERM = null;
                                         } else if (event.key === "Escape") {
                                             console.log("cancel searching for " + search)
                                             event.stopPropagation()
                                             event.target.remove();
                                             await fetch_alert("/inspect/stopsearch/", {cache: "no-store"});
                                             table.focus();
+                                            SELECTED_ROW = null;
                                         }
-                                    });
-                                }
+                                    } else {
+                                        if (event.key === "Enter") {
+                                            console.log("end searching for " + search)
+                                            event.stopPropagation()
+                                            event.target.remove();
+                                            table.focus();
+                                            SEARCH_TERM = null;
+                                        } else if (event.key === "Escape") {
+                                            console.log("cancel searching for " + search)
+                                            event.stopPropagation()
+                                            event.target.remove();
+                                            table.focus();
+                                            SEARCH_TERM = null;
+                                        } else if (event.key === "ArrowDown") {
+                                            const names = await table._view_cache.view(findNameCol(), 0, findNameCol() + 1, stuff.num_rows);
+                                            for (let i = SELECTED_ROW === null ? 0: SELECTED_ROW + 1; i < names.metadata[0].length; i++){
+                                                if (names.metadata[0][i].includes(search)){
+                                                    table.scrollToCell(0, i, names.num_columns, names.num_rows)
+                                                    SELECTED_ROW = i
+                                                    break;
+                                                }
+                                            }
+                                        } else if (event.key === "ArrowUp") {
+                                            const names = await table._view_cache.view(findNameCol(), 0, findNameCol() + 1, stuff.num_rows);
+                                            for (let i = SELECTED_ROW === null ? stuff.num_rows - 1: SELECTED_ROW - 1; i >= 0; i--){
+                                                if (names.metadata[0][i].includes(search)){
+                                                    table.scrollToCell(0, i, names.num_columns, names.num_rows)
+                                                    SELECTED_ROW = i
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    table.draw();
+                                });
                             }
                             if (event.key === "ArrowDown") {
                                 if (SELECTED_ROW === null) {
@@ -270,6 +367,8 @@
                         });
 
                         table.addEventListener("dblclick", async function observerClickEventListener(event) {
+                            event.stopPropagation()
+
                             if (event.target.tagName === "TD") {
                                 const [meta, stuff, row] = await targetInfo(event.target);
 
@@ -289,6 +388,8 @@
                         });
                     }
                 });
+
+                const observe = await fetch("/inspect/expand/", {cache: "no-store"});
             });
         </script>
     </body>

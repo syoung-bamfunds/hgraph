@@ -59,8 +59,14 @@ Operating inspector
 - Ctrl-click an REF output value to navigate to the output that the reference points to
 - Click on an item to select it (it will highlight)
 - Hitting enter expands/collapses the selected item
-- Typing '?' or '/' will open a search box over the selected item, type the name of the item you are looking for 
-and hit Enter to keep them shown, Esc to close the search box
+- Typing '?' will open a search box at the top of the grid, type the name of the item you are looking for 
+in the items already shown in the grid. THe search string will be highlighted in the items that match. Use the Up and 
+Down arrows to jump between the matching items and Enter/Escape to close the search  
+- Typing '/' when there is a highlighted item in the grid will open a search box over the selected item, allowing you to 
+search for items that are not shown on the grid that are children of the selected item up to 3 level deep. Type the name 
+of the item you are looking for and hit Enter to keep them shown, Esc to close the search box. THis type of search only 
+shows the first 10 items to avoid blocking the graph too long, narrow down the search string if the item you are looking 
+for it not shown  
 
 
 Graph performance table

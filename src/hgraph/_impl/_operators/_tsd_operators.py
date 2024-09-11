@@ -96,8 +96,79 @@ def tsd_get_item_default(
     return result
 
 
+@compute_node(overloads=getitem_, valid=())
+def tsd_get_items(
+    ts: REF[TSD[K, TIME_SERIES_TYPE]],
+    key: TSS[K],
+    _ref: TSD[K, REF[TIME_SERIES_TYPE]] = None,
+    _ref_ref: TSD[K, REF[TIME_SERIES_TYPE]] = None,
+    _value_tp: Type[TIME_SERIES_TYPE] = AUTO_RESOLVE,
+    _state: STATE[KeyValueRefState] = None,
+) -> TSD[K, REF[TIME_SERIES_TYPE]]:
+    """
+    Returns TSD of the time-series associated to the keys provided.
+    """
+    # Use tsd as a reference to avoid the cost of the input wrapper
+    # If we got here something was modified so release any previous value and replace
+    if ts.modified:
+        if _state.tsd is not None:
+            for k in _state.key:
+                _ref.on_key_removed(k)
+                _ref_ref.on_key_removed(k)
+                _state.tsd.release_ref(k, _state.reference)
+
+        if ts.valid and ts.value.valid:
+            _state.tsd = ts.value.output
+            _state.key = (key.value - key.added()) if key.valid else set()
+        else:
+            _state.tsd = None
+            _state.key = set()
+
+        if _state.tsd is not None:
+            for k in _state.key:
+                output = _state.tsd.get_ref(k, _state.reference)
+                _ref._create(k)
+                _ref[k].bind_output(output)
+                _ref[k].make_active()
+
+    if _state.tsd is None or not key.valid:
+        return
+
+    for k in key.added():
+        output = _state.tsd.get_ref(k, _state.reference)
+        _ref._create(k)
+        _ref[k].bind_output(output)
+        _ref[k].make_active()
+
+    out = {}
+
+    for k in key.removed():
+        _state.tsd.release_ref(k, _state.reference)
+        _ref.on_key_removed(k)
+        _ref_ref.on_key_removed(k)
+        out[k] = REMOVE_IF_EXISTS
+
+    # This is required if tsd is a TSD of references, the TIME_SERIES_TYPE is captured dereferenced so
+    # we cannot tell if we got one, but in that case tsd_get_ref will return a reference to reference
+    # and the below 'if' deals with that by subscribing to the inner reference too
+    for k, v in _ref.modified_items():
+        if k in _state.tsd.key_set.removed():
+            out[k] = REMOVE_IF_EXISTS
+        elif v.value.has_peer and isinstance(v.value.output, TimeSeriesReferenceOutput):
+            _ref_ref._create(k)
+            _ref_ref[k].bind_output(v.value.output)
+            _ref_ref[k].make_active()
+        else:
+            out[k] = v.value
+
+    for k, v in _ref_ref.modified_items():
+        out[k] = v.value
+
+    return out
+
+
 @compute_node(overloads=getitem_)
-def tsd_get_items(ts: TSD[K, REF[TIME_SERIES_TYPE]], key: TSS[K]) -> TSD[K, REF[TIME_SERIES_TYPE]]:
+def tsd_get_items(ts: TSD[K, REF[TIME_SERIES_TYPE]], key: TSS[K], _refs: TSD[K, REF[TS[bool]]] = None) -> TSD[K, REF[TIME_SERIES_TYPE]]:
     """
     Filters the tsd to the given keys.
     """

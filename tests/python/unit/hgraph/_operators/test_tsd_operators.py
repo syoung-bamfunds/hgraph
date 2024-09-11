@@ -104,6 +104,19 @@ def test_tsd_get_items():
     ) == [None, {1: 3}, {2: 2, 1: 4}, {2: REMOVE, 1: REMOVE}, None]
 
 
+def test_tsd_get_items_refs():
+    @graph
+    def g(ts: TSD[int, TS[int]], keys: TSS[int]) -> TSD[int, TS[int]]:
+        return getitem_(max_(lambda x: x, ts), keys)
+
+    assert eval_node(
+        getitem_,
+        [{1: 1, 2: 2}, {1: 3}, {1: 4}, {1: REMOVE, 2: 5}, {3: 6}],
+        [None, {1}, {2}, {Removed(2)}, None],
+        resolution_dict={"ts": TSD[int, TS[int]], "key": TSS[int]},
+    ) == [None, {1: 3}, {2: 2, 1: 4}, {2: REMOVE, 1: REMOVE}, None]
+
+
 def test_tsd_get_bundle_item():
     class TestBundle(TimeSeriesSchema):
         a: TS[int]
