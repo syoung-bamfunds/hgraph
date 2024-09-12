@@ -103,7 +103,8 @@ class RealTimeEvaluationClock(BaseEvaluationClock):
         self._push_node_requires_scheduling_condition = Condition()
         self._ready_to_push: bool = False
         self._last_time_allowed_push: datetime = MIN_DT
-        self._alarms: SortedList[tuple[datetime, str, Callable]] = SortedList[tuple[datetime, str, Callable]]()
+        self._alarms: SortedList[tuple[datetime, str]] = SortedList[tuple[datetime, str]]()
+        self._alarms_cb: dict[tuple[datetime, str], Callable] = dict[tuple[datetime, str], Callable]()
 
 
     @property
@@ -141,9 +142,10 @@ class RealTimeEvaluationClock(BaseEvaluationClock):
         while self._alarms:  # Process all alarms that are due and reschedule for the upcoming ones
             next_alarm_time = self._alarms[0][0]
             if now >= next_alarm_time:  # Alarm is due
-                _, name, callback = self._alarms.pop(0)
+                t, name = self._alarms.pop(0)
                 next_scheduled_time = self.evaluation_time + MIN_TD
-                callback(next_scheduled_time)
+                if (callback := self._alarms_cb.pop((t, name), None)) is not None:
+                    callback(next_scheduled_time)
             elif next_scheduled_time > next_alarm_time:
                 next_scheduled_time = next_alarm_time
                 break
@@ -169,8 +171,9 @@ class RealTimeEvaluationClock(BaseEvaluationClock):
         while self._alarms:  # Check if any alarms have gone off while we slept
             next_alarm_time = self._alarms[0][0]
             if now >= next_alarm_time:  # Alarm is due
-                _, name, callback = self._alarms.pop(0)
-                callback(self.evaluation_time)
+                t, name = self._alarms.pop(0)
+                if (callback := self._alarms_cb.pop((t, name), None)) is not None:
+                    callback(self.evaluation_time)
             else:
                 break
 
@@ -187,7 +190,9 @@ class RealTimeEvaluationClock(BaseEvaluationClock):
         elif time <= self.evaluation_time:
             raise ValueError(f"Cannot set alarm in the engine's past: {time} <= {self.evaluation_time}")
 
-        self._alarms.add((time, name, callback))
+        self._alarms.add((time, name))
+        self._alarms_cb[(time, name)] = callback
 
     def cancel_alarm(self, name: str):
-        self._alarms = SortedList((t, n, c) for t, n, c in self._alarms if n != name)
+        self._alarms = SortedList((t, n) for t, n in self._alarms
+                                  if (n != name or (self._alarms_cb.pop((t, n), None) and False)))  # alarm_cb.pop is here so we dont have to iterate twice

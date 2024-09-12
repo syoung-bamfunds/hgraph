@@ -72,6 +72,7 @@ def test_wall_clock_scheduler():
     @graph
     def g():
         record(my_scheduler_realtime(100000, "TAG"))
+        my_scheduler_realtime(10000, "TAG")  # to make sure different alarms do not interfere
         sleep(schedule(timedelta(milliseconds=7), initial_delay=True), 0.01)
 
     now = datetime.utcnow()
