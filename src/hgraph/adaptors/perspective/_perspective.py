@@ -142,15 +142,22 @@ class PerspectiveTablesManager:
                             d0[k] = True
                 data = {k: v for k, v in d1.items() if k in d0}
 
-            data = pyarrow.record_batch(data)
-            sink = pyarrow.BufferOutputStream()
+            batch = pyarrow.record_batch(data)
+            stream = pyarrow.BufferOutputStream()
 
-            with pyarrow.ipc.new_stream(sink, data.schema) as writer:
-                writer.write_batch(data)
+            with pyarrow.ipc.new_stream(stream, batch.schema) as writer:
+                writer.write_batch(batch)
 
-            arrow = sink.getvalue().to_pybytes()
+            arrow = stream.getvalue().to_pybytes()
 
-            self._manager_for_table(name).call_loop(lambda: table.update(arrow))
+            def table_update(table, update, data):
+                try:
+                    table.update(data)
+                except Exception as e:
+                    print(f"Error updating table {table} with {data}: {e}")
+                    raise
+
+            self._manager_for_table(name).call_loop(lambda: table_update(table, arrow, data))
 
         if removals:
             if table.get_index() and not self.server_tables:
