@@ -188,6 +188,7 @@ def test_race_tsd_of_bundles_switch_bundle_types():
         b: TS[int]
 
     class SC(S):
+        free: TS[bool]
         cond: TS[bool]
 
     @compute_node
@@ -196,10 +197,10 @@ def test_race_tsd_of_bundles_switch_bundle_types():
 
     @graph
     def make_bundle(ts: TSB[SC]) -> TSB[S]:
-        return switch_(key=ts.a == ts.b,
+        return switch_(key=ts.free, reload_on_ticked=True,
                        switches={
-                           True: lambda a, b, cond: filter_(cond, combine[TSB[S]](a=a, b=b)),  # normal bundle
-                           False: lambda a, b, cond: combine[TSB[S]](a=make_ref(a, a), b=make_ref(b, b)),  # free bundle
+                           False: lambda a, b, cond: filter_(cond, combine[TSB[S]](a=a, b=b)),  # normal bundle
+                           True: lambda a, b, cond: combine[TSB[S]](a=make_ref(a, a), b=make_ref(b, b)),  # free bundle
                        },
                        a=ts.a, b=ts.b, cond=ts.cond)
 
@@ -210,16 +211,24 @@ def test_race_tsd_of_bundles_switch_bundle_types():
 
     assert eval_node(g, __trace__=True,
                      ts=[
-                         None,
-                         {1: {'a': 0, 'b': 0, 'cond': False}, 2: {'a': 0, 'b': 1}},
-                         {1: {'a': 0, 'b': 0, 'cond': True}},
-                         {1: {'a': 1, 'b': 2, 'cond': False}},
-                         {2: REMOVE}
+                         {1: {'free': False}, 2: {'free': True}},
+                         {1: {'a': 0, 'cond': False}},
+                         {1: {'a': 0, 'cond': True}},
+                         {2: {'a': 2, 'b': 1}},
+                         {1: {'a': 1, 'b': 2}},
+                         {1: {'free': False, 'cond': False}},  # reset the switch
+                         {1: {'a': 3, 'b': 3, 'cond': True}},  # rebuild the bundle
+                         {2: REMOVE},
+                         {2: {'a': 0, 'b': 0}},
+
                      ]
                      ) == [
         None,
-        {'b': 1},
+        None,
         {'a': 0},
+        {'b': 1},
         {'a': 1},
-        {'b': 2}
+        {'a': 2},
+        None,
+        {'a': 3, 'b': 3}
     ]
