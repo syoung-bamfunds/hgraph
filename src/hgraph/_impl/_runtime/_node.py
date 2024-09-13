@@ -196,7 +196,7 @@ class BaseNodeImpl(Node, ABC):
 
         if scheduled:
             self._scheduler.advance()
-        elif self.scheduler.is_scheduled:
+        elif self.scheduler.requires_scheduling:
             self.graph.schedule_node(self.node_ndx, self.scheduler.next_scheduled_time)
 
     @abstractmethod
@@ -319,8 +319,12 @@ class NodeSchedulerImpl(NodeScheduler):
         return self._scheduled_events[0][0] if self._scheduled_events else MIN_DT
 
     @property
-    def is_scheduled(self) -> bool:
+    def requires_scheduling(self) -> bool:
         return bool(self._scheduled_events)
+
+    @property
+    def is_scheduled(self) -> bool:
+        return bool(self._scheduled_events) or bool(self._alarm_tags)
 
     @property
     def is_scheduled_now(self) -> bool:
@@ -366,6 +370,7 @@ class NodeSchedulerImpl(NodeScheduler):
 
     def _on_alarm(self, when: datetime, tag: str):
         self._tags[tag] = when
+        self._alarm_tags.pop(f"{id(self)}:{tag}")
         self._scheduled_events.add((when, tag))
         self._node.graph.schedule_node(self._node.node_ndx, when)
 
