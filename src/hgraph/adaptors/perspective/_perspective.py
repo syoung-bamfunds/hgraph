@@ -152,7 +152,7 @@ class PerspectiveTablesManager:
 
             def table_update(table, update, data):
                 try:
-                    table.update(data)
+                    table.update(update)
                 except Exception as e:
                     print(f"Error updating table {table} with {data}: {e}")
                     raise
