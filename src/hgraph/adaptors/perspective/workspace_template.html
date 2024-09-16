@@ -41,6 +41,8 @@
         <script type="module">
             import perspective from "/node_modules/@finos/perspective/dist/cdn/perspective.js";
 
+            //{% include table_workarounds.js %}
+
             window.addEventListener("DOMContentLoaded", async function () {
                 const workspace = window.workspace
                 const worker = perspective.worker();
@@ -93,27 +95,7 @@
 
                 window.workspace.addEventListener("workspace-layout-update", async () => {
                     await fetch("/layout/{{url}}", {method: "post", body: JSON.stringify(await window.workspace.save())});
-
-                    for (const g of document.querySelectorAll("perspective-viewer perspective-viewer-datagrid-norollups")){
-                        const table = g.shadowRoot.querySelector("regular-table")
-
-                        if (table.dataset.events_set_up){
-                            continue;
-                        }
-                        table.dataset.events_set_up = true;
-
-                        let psp_stylesheet = g.shadowRoot.adoptedStyleSheets[0];
-                        for (let i = 0; i < psp_stylesheet.cssRules.length; i++) {
-                            if (psp_stylesheet.cssRules[i].selectorText === 'regular-table table tbody td') {
-                                psp_stylesheet.deleteRule(i);
-                                console.log("Deleted rule");
-                                psp_stylesheet.addRule('regular-table table tbody td', 'min-width: 1px !important;');
-                            }
-                        }
-                        table._resetAutoSize();
-                        table._reset_scroll();
-                        table.clear();
-                    }
+                    installTableWorkarounds();
                 });
             });
         </script>

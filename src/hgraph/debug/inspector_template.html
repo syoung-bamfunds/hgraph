@@ -31,6 +31,8 @@
         <script type="module">
             import perspective from "/node_modules/@finos/perspective/dist/cdn/perspective.js";
 
+            //{% include ../adaptors/perspective/table_workarounds.js %}
+
             window.addEventListener("DOMContentLoaded", async function () {
                 const workspace = window.workspace
                 const worker = perspective.worker();
@@ -84,21 +86,17 @@
                 window.workspace.addEventListener("workspace-layout-update", async () => {
                     await fetch("/layout/{{url}}", {method: "post", body: JSON.stringify(await window.workspace.save())});
 
+                    installTableWorkarounds();
+
                     for (const g of document.querySelectorAll("perspective-viewer[table='inspector'] perspective-viewer-datagrid")){
                         const table = g.shadowRoot.querySelector("regular-table")
 
-                        if (table.dataset.events_set_up){
-                            continue;
-                        }
-                        table.dataset.events_set_up = true;
+                        if (table.dataset.inspector_events_set_up) continue;
+                        table.dataset.inspector_events_set_up = true;
 
                         var sheet = new CSSStyleSheet
                         sheet.replaceSync( `.highlight { background-color: pink }`)
                         g.shadowRoot.adoptedStyleSheets.push(sheet)
-
-                        function isOverflown(element) {
-                          return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
-                        }
 
                         let name_col = null;
                         function findNameCol(){
@@ -131,15 +129,6 @@
                                     if (name.innerText.includes(SEARCH_TERM)){
                                         name.innerHTML = name.innerText.replace(SEARCH_TERM, "<mark>" + SEARCH_TERM + "</mark>");
                                     }
-                                }
-
-                                for (const td of tr.children) {
-                                    if (isOverflown(td)) {
-                                        td.title = td.innerText;
-                                    } else {
-                                        td.title = "";
-                                    }
-                                    td.style.overflow = "clip";
                                 }
                             }
                         })
