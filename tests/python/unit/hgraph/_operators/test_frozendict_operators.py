@@ -5,7 +5,7 @@ import pytest
 from frozendict import frozendict
 
 from hgraph import OUT, TSS, \
-    Removed, values_, rekey, flip, partition, flip_keys, keys_, collapse_keys, uncollapse_keys
+    Removed, values_, rekey, flip, partition, flip_keys, keys_, collapse_keys, uncollapse_keys, TSD, REMOVE
 from hgraph import sub_, getitem_, TS, and_, graph, KEYABLE_SCALAR, SCALAR, or_, min_, max_, sum_, str_, WiringError, \
     mean, std, var
 from hgraph.test import eval_node
@@ -200,6 +200,32 @@ def test_flip():
                          frozendict({1: "c"})]) == [frozendict({"a": 1, "b": 2}),
                                                     frozendict({"c": 1, "b": 2}),
                                                     frozendict({"c": 1})]
+
+
+def test_flip_tsd():
+    @graph
+    def g(ts: TSD[int, TS[str]]) -> TSD[str, TS[int]]:
+        return flip(ts)
+
+    assert eval_node(g, [frozendict({1: "a", 2: "b"}),
+                         frozendict({1: "c", 2: "b"}),
+                         frozendict({1: "c"})]) == [frozendict({"a": 1, "b": 2}),
+                                                    frozendict({"c": 1, "b": 2, 'a': REMOVE}),
+                                                    frozendict({"c": 1})]
+
+
+def test_flip_tsd_non_unique():
+    @graph
+    def g(ts: TSD[int, TS[str]]) -> TSD[str, TSS[int]]:
+        return flip(ts, unique=False)
+
+    assert eval_node(g, [{1: "a", 2: "b"},
+                         {1: "c", 2: "b"},
+                         {1: "c", 4: "c"},
+                         {1: REMOVE, 4: REMOVE}], __trace__=True) == [{"a": {1}, "b": {2}},
+                                                                {"c": {1}, 'a': REMOVE},
+                                                                {"c": {4}},
+                                                                {"c": REMOVE}]
 
 
 def test_partition():

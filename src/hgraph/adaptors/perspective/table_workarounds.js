@@ -14,7 +14,7 @@ function installTableWorkarounds(){
         for (let i = 0; i < psp_stylesheet.cssRules.length; i++) {
             if (psp_stylesheet.cssRules[i].selectorText === 'regular-table table tbody td') {
                 psp_stylesheet.deleteRule(i);
-                psp_stylesheet.addRule('regular-table table tbody td', 'min-width: 1px !important;');
+                psp_stylesheet.insertRule('regular-table table tbody td { min-width: 1px !important; }');
             }
         }
 

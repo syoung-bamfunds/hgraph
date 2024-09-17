@@ -40,7 +40,7 @@ from hgraph._types._scalar_types import SCALAR, STATE, CompoundScalar, NUMBER
 from hgraph._types._time_series_types import TIME_SERIES_TYPE, OUT, K_1, V
 from hgraph._types._ts_type import TS
 from hgraph._types._tsb_type import TSB, TS_SCHEMA
-from hgraph._types._tsd_type import TSD, K, REMOVE_IF_EXISTS
+from hgraph._types._tsd_type import TSD, K, REMOVE_IF_EXISTS, TSD_OUT
 from hgraph._types._tsl_type import TSL, SIZE
 from hgraph._types._tss_type import TSS
 from hgraph._types._type_meta_data import AUTO_RESOLVE
@@ -425,30 +425,29 @@ def flip_tsd(ts: TSD[K, TS[K_1]], _state: STATE[TsdRekeyState] = None) -> TSD[K_
 
 
 @compute_node(overloads=flip, requires=lambda m, s: s["unique"] is False)
-def flip_tsd_non_unique(ts: TSD[K, TS[K_1]], unique: bool, _state: STATE[TsdRekeyState] = None) -> TSD[K_1, TSS[K]]:
+def flip_tsd_non_unique(ts: TSD[K, TS[K_1]], unique: bool, _state: STATE[TsdRekeyState] = None, _output: TSD_OUT[K_1, TSS[K]] = None) -> TSD[K_1, TSS[K]]:
     """
     Flip the TSD to have the time-series as the key and the key as the time-series. Collect keys for duplicate values into TSS
     """
-    from hgraph import Removed
-
-    out = defaultdict(set)
     prev = _state.prev
 
     # Clear up existing mapping before we track new key mappings
     for k in ts.removed_keys():
-        k_new = prev.pop(k, None)
-        if k_new is not None:
-            out[k_new].add(Removed(k))
+        k_old = prev.pop(k, None)
+        if k_old is not None:
+            _output[k_old].remove(k)
 
     for k, v in ts.modified_items():
         v = v.value
-        k_new = prev.pop(k, None)
-        if k_new is not None:
-            out[k_new].add(Removed(k))
-        out[v].add(k)
+        k_old = prev.pop(k, None)
+        if k_old is not None and k_old != v:
+            _output[k_old].remove(k)
+        _output.get_or_create(v).add(k)
         prev[k] = v
 
-    return out
+    drop = {k for k, v in _output.modified_items() if not v}
+    for k in drop:
+        del _output[k]
 
 
 @compute_node(overloads=flip_keys)
