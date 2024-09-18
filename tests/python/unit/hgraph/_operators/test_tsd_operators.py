@@ -171,6 +171,20 @@ def test_flip():
     ]
 
 
+def test_flip_tsd_non_unique():
+    @graph
+    def g(ts: TSD[int, TS[str]]) -> TSD[str, TSS[int]]:
+        return flip(ts, unique=False)
+
+    assert eval_node(g, [{1: "a", 2: "b"},
+                         {1: "c", 2: "b"},
+                         {1: "c", 4: "c"},
+                         {1: REMOVE, 4: REMOVE}]) == [{"a": {1}, "b": {2}},
+                                                                {"c": {1}, 'a': REMOVE},
+                                                                {"c": {4}},
+                                                                {"c": REMOVE}]
+
+
 def test_flip_keys():
     @graph
     def g(ts: TSD[int, TSD[str, TS[int]]]) -> TSD[str, TSD[int, TS[int]]]:

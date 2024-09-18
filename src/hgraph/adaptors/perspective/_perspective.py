@@ -161,9 +161,10 @@ class PerspectiveTablesManager:
 
         if removals:
             if table.get_index() and not self.server_tables:
-                self.update_table(name + "_removes", {"i": list(removals)})
-            else:
-                self._manager_for_table(name).call_loop(lambda: table.remove(removals))
+                self.update_table(name + "_removes", {"i": list(removals)},
+                                  removals=data[table.get_index()] if data else [])
+
+            self._manager_for_table(name).call_loop(lambda: table.remove(removals))
 
         # table.update(data)
 
