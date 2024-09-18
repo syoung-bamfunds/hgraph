@@ -31,8 +31,14 @@
         <script type="module">
             import perspective from "/node_modules/@finos/perspective/dist/cdn/perspective.js";
 
+            //{% import os %}
+            //{% if os.name == "nt" %}
             //{% include ../adaptors/perspective/table_workarounds.js %}
             //{% include ../adaptors/perspective/workspace_tables.js %}
+            //{% else %}
+            //{% include table_workarounds.js %}
+            //{% include workspace_tables.js %}
+            //{% end %}
 
             window.addEventListener("DOMContentLoaded", async function () {
                 const workspace = window.workspace
