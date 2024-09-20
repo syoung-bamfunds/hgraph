@@ -223,9 +223,9 @@ def is_empty_tsd(ts: TSD[K, TIME_SERIES_TYPE]) -> TS[bool]:
     return is_empty(ts.key_set)
 
 
-@graph(overloads=len_)
+@compute_node(overloads=len_)
 def len_tsd(ts: TSD[K, TIME_SERIES_TYPE]) -> TS[int]:
-    return len_(ts.key_set)
+    return len(ts)
 
 
 @graph(overloads=sub_)

@@ -175,9 +175,10 @@ def run_graph(
                "trace": __trace__,
                "profile": __profile__,
                "trace_wiring": __trace_wiring__,
-               "graph_logger": __logger__
                }
 
+    if __logger__ is not None:
+        kwargs_["graph_logger"] = __logger__
     if start_time is not None:
         kwargs_["start_time"] = start_time
     if end_time is not None:
