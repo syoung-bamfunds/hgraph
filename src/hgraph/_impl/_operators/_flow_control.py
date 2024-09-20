@@ -162,16 +162,15 @@ def _ref_valid(value):
 
 @dataclass
 class _RaceTsdOfBundlesState(CompoundScalar):
+    first_valid_hashes: dict = field(default_factory=lambda: defaultdict(lambda : defaultdict(lambda: MAX_DT)))
     first_valid_times: dict = field(default_factory=lambda: defaultdict(lambda : defaultdict(lambda: MAX_DT)))
     winners: list[K] = None
 
 
-@compute_node(overloads=race, active=("tsd",),
-              resolvers={TS_SCHEMA_1: lambda m, s: ts_schema(**{k: REF[t.py_type] for k, t in m[TS_SCHEMA].meta_data_schema.items()})})
+@compute_node(overloads=race, active=("tsd",))
 def race_tsd_of_bundles(
     tsd: TSD[K, REF[TSB[TS_SCHEMA]]],
     _values: TSD[K, TSB[TS_SCHEMA]] = None,
-    _ref_values: TSD[K, TSB[TS_SCHEMA_1]] = None,
     _state: STATE[_RaceTsdOfBundlesState] = None,
     _ec: EvaluationClock = None,
     _schema: type[TS_SCHEMA] = TS_SCHEMA,
@@ -179,44 +178,52 @@ def race_tsd_of_bundles(
 ) -> REF[TSB[TS_SCHEMA]]:
     # Keep track of the first time each input goes valid (and invalid)
     pending_values = {}
-    pending_refs = defaultdict(dict)
+    pending_items = defaultdict(dict)
 
     for k in tsd.removed_keys():
         for i in _schema.__meta_data_schema__:
             _state.first_valid_times.get(i, {}).pop(k, None)
         _values.on_key_removed(k)
-        _ref_values.on_key_removed(k)
 
-    for k in set(tsd.modified_keys()) | set(_values.modified_keys()) | set(_ref_values.modified_keys()):
+    for k in tsd.valid_keys():
         v = tsd[k]
         if _ref_input_valid(v):
             ref = v.value
             if ref.output:
-                for i, r in ref.output.items():
-                    if k not in _state.first_valid_times.get(i, {}):
-                        _state.first_valid_times[i][k] = _ec.now
+                for n, r in ref.output.items():
+                    if r.valid:
+                        if _state.first_valid_hashes.get(n, {}).get(k, None) != id(r):
+                            _state.first_valid_hashes[n][k] = id(r)
+                            _state.first_valid_times[n][k] = _ec.now
+                    else:
+                        _state.first_valid_times.get(n, {}).pop(k, None)
+                        _state.first_valid_hashes.get(n, {}).pop(k, None)
+                        pending_items[n][k] = PythonTimeSeriesReference(r)
                 if k in _values:
                     _values[k].make_passive()
                     PythonTimeSeriesReference().bind_input(_values[k])
             else:
                 for i, n in enumerate(_schema.__meta_data_schema__):
-                    if k not in _state.first_valid_times.get(n, {}):
-                        if (r := ref.items[i]) and _ref_valid(r):
+                    if (r := ref.items[i]) and _ref_valid(r):
+                        if _state.first_valid_hashes.get(n, {}).get(k, None) != r:
+                            _state.first_valid_hashes[n][k] = r
                             _state.first_valid_times[n][k] = _ec.now
-                        elif r:
-                            pending_refs[n][k] = ref.items[i]
-                            _state.first_valid_times.get(n, {}).pop(k, None)
-                        else:
-                            _state.first_valid_times.get(n, {}).pop(k, None)
-                    elif not ref.items[i].valid:
+                    elif r:
                         _state.first_valid_times.get(n, {}).pop(k, None)
+                        _state.first_valid_hashes.get(n, {}).pop(k, None)
+                        pending_items[n][k] = ref.items[i]
+                    else:
+                        _state.first_valid_times.get(n, {}).pop(k, None)
+                        _state.first_valid_hashes.get(n, {}).pop(k, None)
         elif v.valid and v.value.output:  # valid reference but invalid referee
             pending_values[k] = v.value
-            for i in _schema.__meta_data_schema__:
-                _state.first_valid_times.get(i, {}).pop(k, None)
+            for n in _schema.__meta_data_schema__:
+                _state.first_valid_times.get(n, {}).pop(k, None)
+                _state.first_valid_hashes.get(n, {}).pop(k, None)
         else:
-            for i in _schema.__meta_data_schema__:
-                _state.first_valid_times.get(i, {}).pop(k, None)
+            for n in _schema.__meta_data_schema__:
+                _state.first_valid_times.get(n, {}).pop(k, None)
+                _state.first_valid_hashes.get(n, {}).pop(k, None)
 
     # Forward the input with the earliest valid time
     winners = _state.winners
@@ -231,15 +238,16 @@ def race_tsd_of_bundles(
             winner = min(_state.first_valid_times.get(n, {}).items(), default=None, key=lambda item: item[1])
             if winner is not None:
                 new_winners[i] = winner[0]
-                for v in _ref_values.valid_values():  # make all values passive and disconnect now that we have a winner
-                    v[n].make_passive()
-                    PythonTimeSeriesReference().bind_input(v[n])
+                for v in _values.valid_values():  # make all values passive and disconnect now that we have a winner
+                    if v[n].bound:
+                        v[n].make_passive()
+                        PythonTimeSeriesReference().bind_input(v[n])
             else:  # if no winner, track timeseries where we have reference but no value
                 new_winners[i] = None
-                for k, r in pending_refs.get(n, {}).items():
-                    if k not in _ref_values:
-                        _ref_values._create(k)
-                    if not (v := _ref_values[k][n]).active:
+                for k, r in pending_items.get(n, {}).items():
+                    if k not in _values:
+                        _values._create(k)
+                    if not (v := _values[k][n]).active:
                         r.bind_input(v)
                         v.make_active()
         else:
